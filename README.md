@@ -8,10 +8,13 @@ Requirements:
 
 # Tested Environments
 
-|                 |  4K  | 16K |
-|-----------------|------|------|
-|VMAPPLE on M1 Pro|  ✅  |  ✅  |
-|  M4 Bare Metal  |  ✅  |  ✅  |
+|                 |  4K (1GB blocks) | 4K (2MB blocks) | 16K |
+|-----------------|------------------|-----------------|-----|
+|VMAPPLE on M1 Pro|        ✅        |        ✅        |  ✅  |
+|  M1 Bare Metal  |        ❌        |        ✅        |  ✅  |
+|  M4 Bare Metal  |        ❌        |        ✅        |  ✅  |
+
+Bare metal systems don't seem to like 1GB blocks, but are fine with 2MB ones.
 
 # Setup
 
