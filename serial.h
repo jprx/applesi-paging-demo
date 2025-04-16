@@ -8,7 +8,13 @@
 // (Look in /S/V/Preboot, or an IPSW file)
 
 // #define APPLESI_MODE_VMAPPLE
+// #define APPLESI_MODE_M1
 #define APPLESI_MODE_M4
+
+#ifdef APPLESI_MODE_M1
+#define SERIAL_BASEADDR 0x235200000
+#define SERIAL_WRITE_PORT_OFFSET 0x20
+#endif // APPLESI_MODE_M1
 
 // Real M4 devices:
 #ifdef APPLESI_MODE_M4

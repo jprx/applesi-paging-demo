@@ -8,14 +8,14 @@ Requirements:
 
 # Tested Environments
 
-|                 |         4K        | 16K |
-|-----------------|-------------------|-----|
-|VMAPPLE on M1 Pro|         ✅        |  ✅  |
-|  M4 Bare Metal  | ❌ (traps to EL2) |  ✅  |
+|                 |  4K  | 16K |
+|-----------------|------|------|
+|VMAPPLE on M1 Pro|  ✅  |  ✅  |
+|  M4 Bare Metal  |  ✅  |  ✅  |
 
 # Setup
 
-First, pick your mode (4k or 16k page sizes) at the top of `start.s`.
+First, pick your mode (4k or 16k page sizes) in `config.h`.
 Then, make sure your serial port is correct for your platform in `serial.h`.
 
 Finally, follow these steps to build and run:
