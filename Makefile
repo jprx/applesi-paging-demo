@@ -11,7 +11,7 @@ CFLAGS  = $(FLAGS)
 LDFLAGS1 = -nostdlib -ffreestanding -fPIE
 LDFLAGS2 = -Wl,--no-warn-rwx-segments -Wl,--no-relax -Wl,-pie -Wl,-no-dynamic-linker
 
-OBJS := start.o paging.o printf.o exception.o debug_regs.o
+OBJS := start.o paging.o printf.o exception.o debug_regs.o main.o memcpy.o
 DEPS := $(OBJS:%.o=%.d)
 RESULTS := demo.obj demo.bin
 

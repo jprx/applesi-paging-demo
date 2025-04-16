@@ -60,6 +60,9 @@
 // Keep it simple- all memory is device memory nGnRnE
 #define MAIR_BRINGUP 0x0000000000000000ULL
 
+// In reality, this is 0x480, but we grab a few extra bytes to be safe
+#define BOOT_ARGS_SIZE ((0x500))
+
 // MOV64(r, imm)- mov 64-bit immediate imm into register r
 .macro MOV64 r, imm
     movz \r, #(((\imm) >> 48) & 0x0FFFF), lsl #48
@@ -87,18 +90,50 @@ demo_start:
     /* Disable interrupts */
     msr daifset, 0xF
 
-    /* Set aside iBoot info for later */
+    /* iBoot info */
     mov x27, x0
 
     SERIAL_PUTC 'H'
     SERIAL_PUTC 'i'
     SERIAL_PUTC '\n'
 
-    /* Seems like we can't turn off E2H nor RW */
-    msr hcr_el2, xzr
+    /* Switch to EL1, if we aren't already there */
+    mrs x0, CurrentEL
+    cmp x0, 4
+    beq demo_start_el1
 
+switch_to_el1:
+    /* Setup an exception table in EL2 before we leave,
+     * so we can catch any exceptions that make their way up here */
     LEA64 x0, exception_el2
     msr vbar_el2, x0
+
+    msr sctlr_el1, xzr
+
+    /* HCR.RW = 1 (enable AARCH64 at EL1) */
+    /* Seems like we can't turn off E2H nor RW */
+    msr hcr_el2, xzr
+    mrs x0, hcr_el2
+    orr x0, x0, #(1 << 31)
+    msr hcr_el2, x0
+
+    MOV64 x0, TCR_DEFAULT_EL2
+    msr tcr_el2, x0
+
+    MOV64 x0, MAIR_BRINGUP
+    msr mair_el2, x0
+
+    LEA64 x0, demo_start_el1
+    msr elr_el2, x0
+
+    // I and F set, prev mode is EL1h
+    MOV64 x0, 0x65
+    msr spsr_el2, x0
+    eret
+
+demo_start_el1:
+    LEA64 x0, exception_el1
+    msr vbar_el1, x0
 
     /* C code needs a stack */
     mov x0, 1
@@ -106,6 +141,13 @@ demo_start:
     adrp fp, _stack_bottom
     and fp, fp, #0xFFFFFFFFFFFF0000
     mov sp, fp
+
+    /* Set aside iBoot info for later */
+    /* We're going to overwrite it in RAM with page tables so copy it somewhere safe */
+    LEA64 x0, boot_args_copy
+    mov x1, x27
+    MOV64 x2, BOOT_ARGS_SIZE
+    bl _memcpy_fast
 
     /* Construct page tables at runtime, 
      * as we don't know where we'll be loaded */
@@ -120,23 +162,18 @@ demo_start:
 #endif // DEMO_USE_16K
 
     LEA64 x0, _page_tables
-    msr ttbr0_el2, x0
     msr ttbr0_el1, x0
     msr ttbr1_el1, x0
     MOV64 x0, MAIR_BRINGUP
-    msr mair_el2, x0
-    MOV64 x0, TCR_DEFAULT_EL2
-    msr tcr_el2, x0
+    msr mair_el1, x0
     MOV64 x0, TCR_DEFAULT_EL1
     msr tcr_el1, x0
     isb
 
-    bl dump_regs
-
     /* Just enable MMU (no caches or anything) */
-    mrs x0, sctlr_el2
+    mrs x0, sctlr_el1
     orr x0, x0, #1
-    msr sctlr_el2, x0
+    msr sctlr_el1, x0
 
     /* Flush TLB */
     dsb ishst
@@ -145,25 +182,8 @@ demo_start:
     isb
 
     /* Paging is now enabled */
-print_res:
-    SERIAL_PUTC 'D'
-    SERIAL_PUTC 'o'
-    SERIAL_PUTC 'n'
-    SERIAL_PUTC 'e'
-    SERIAL_PUTC ' '
-    SERIAL_PUTC '('
-#ifdef DEMO_USE_4K
-    SERIAL_PUTC '4'
-    SERIAL_PUTC 'K'
-#endif // DEMO_USE_4k
-#ifdef DEMO_USE_16K
-    SERIAL_PUTC '1'
-    SERIAL_PUTC '6'
-    SERIAL_PUTC 'K'
-#endif // DEMO_USE_16k
-    SERIAL_PUTC ')'
-    SERIAL_PUTC '!'
-    SERIAL_PUTC '\n'
+    LEA64 x0, boot_args_copy
+    bl demo_main
     b .
 
 .align 14
@@ -180,3 +200,22 @@ exception_el2:
     LEA64 fp, _stack_bottom
     mov sp, fp
     b handle_exception_el2
+
+.align 14
+exception_el1:
+    .rept 8192
+    nop
+    .endr
+    SERIAL_PUTC 'E'
+    SERIAL_PUTC 'L'
+    SERIAL_PUTC '1'
+    SERIAL_PUTC '\n'
+    mov x0, 1
+    msr SPSel, x0
+    LEA64 fp, _stack_bottom
+    mov sp, fp
+    b handle_exception_el1
+
+
+boot_args_copy:
+    .fill 0x500, 1, 0
